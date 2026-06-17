@@ -1,0 +1,20 @@
+# CODEOWNERS for terraform-aws-ecs-fargate
+#
+# This module runs application workloads and mints the IAM roles they assume
+# + the security group that fronts them. Security has equity in every file.
+#
+# Per Module-Repo Plan v1.3 §16 governance.
+
+# Default: every change requires both teams to approve.
+*                          @devotica-labs/cloud-leads @devotica-labs/security
+
+# Security-primary: IAM roles, the rendered container/task definition, and
+# the service network surface.
+/main.tf                   @devotica-labs/security @devotica-labs/cloud-leads
+/data.tf                   @devotica-labs/security @devotica-labs/cloud-leads
+/locals.tf                 @devotica-labs/security @devotica-labs/cloud-leads
+/variables.tf              @devotica-labs/security @devotica-labs/cloud-leads
+
+# CI/CD pipelines.
+/.github/                  @devotica-labs/cloud-leads @devotica-labs/security
+/.github/workflows/        @devotica-labs/cloud-leads @devotica-labs/security

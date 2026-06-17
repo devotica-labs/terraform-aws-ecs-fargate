@@ -1,0 +1,23 @@
+# CI for terraform-aws-ecs-fargate — uses the central reusable workflow.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  ci:
+    uses: devotica-labs/terraform-shared-config/.github/workflows/terraform-module-ci.yml@v1
+    with:
+      terraform-version: "1.9.5"
+      working-directory: "."
+      terraform-docs-auto-update: true
+    secrets: inherit

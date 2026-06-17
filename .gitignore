@@ -1,0 +1,13 @@
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform/
+*.tfplan
+*.binary
+tfplan.json
+crash.log
+.infracost/
+.DS_Store
+.vscode/
+*.tfvars
+!examples/**/*.tfvars

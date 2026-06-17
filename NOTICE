@@ -1,0 +1,39 @@
+terraform-aws-ecs-fargate
+Copyright 2026 Devotica Labs
+
+This product includes software developed at Devotica Labs
+(https://github.com/devotica-labs).
+
+================================================================================
+
+This module adopts the same governance shape as the rest of the Devotica
+catalog (terraform-aws-vpc / iam / s3 / kms / rds / alb): unified Foundation
+Plan §15.2 tagging, the central reusable CI workflow in
+devotica-labs/terraform-shared-config, and conftest policies from
+devotica-labs/terraform-policies.
+
+It is the application-compute layer that ties the rest together:
+
+  terraform-aws-vpc   → private subnet IDs the tasks run in
+  terraform-aws-alb   → target group the service registers with + the ALB
+                        security group allowed as ingress
+  terraform-aws-kms   → key that encrypts the CloudWatch log group + secrets
+  terraform-aws-iam   → (optional) externally-managed task / execution roles
+  terraform-aws-rds   → the service's task role is granted DB access; the
+                        DB security group allows ingress from this module's
+                        service security group
+
+Fintech-safe defaults: private networking (assign_public_ip = false),
+ECS Exec off, Container Insights on, read-only container root filesystem,
+KMS-encryptable logs, ARM64/Graviton runtime, 2 tasks for HA, and a service
+security group that only admits the configured source SGs on the container
+port.
+
+v0.1 scope is a single-container Fargate service. Deferred: sidecar
+containers, Cloud Map service discovery, EFS volumes, and blue/green
+CodeDeploy — see the README scope table.
+
+================================================================================
+
+Third-party components and their licenses are documented in CHANGELOG.md
+and inline where used.

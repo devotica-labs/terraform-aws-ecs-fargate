@@ -1,0 +1,47 @@
+name: Integration Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type 'run' to create real AWS resources."
+        required: true
+      vpc_id:
+        description: "Existing VPC ID."
+        required: true
+      subnet_id_a:
+        description: "Private subnet ID in AZ a."
+        required: true
+      subnet_id_b:
+        description: "Private subnet ID in AZ b."
+        required: true
+      ingress_security_group_id:
+        description: "Source security group ID allowed as ingress."
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  integration:
+    name: terraform test (integration)
+    if: github.event.inputs.confirm == 'run'
+    runs-on: ubuntu-latest
+    environment: sandbox
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: "1.9.5" }
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_OIDC_ROLE_ARN }}
+          aws-region: ap-south-1
+      - run: terraform init
+      - name: terraform test (integration)
+        env:
+          TF_VAR_vpc_id: ${{ inputs.vpc_id }}
+          TF_VAR_subnet_ids: '["${{ inputs.subnet_id_a }}","${{ inputs.subnet_id_b }}"]'
+          TF_VAR_ingress_security_group_ids: '["${{ inputs.ingress_security_group_id }}"]'
+        run: terraform test -filter=tests/integration.tftest.hcl

@@ -1,0 +1,50 @@
+# Auto-approve + auto-merge Dependabot PRs once CI passes.
+# See the catalog-wide rationale; mirrors the other module repos.
+#
+# pull_request_target so secrets are reachable on Dependabot PRs; never
+# checks out or runs PR code (no injection surface) — only GH API calls
+# with the trusted PR URL. Fail-soft: unprotected repos auto-merge with the
+# built-in token; protected repos need a devotica-bot BOT_REVIEW_TOKEN.
+
+name: Dependabot auto-merge
+
+on: pull_request_target
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: ${{ github.actor == 'dependabot[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v2
+
+      - name: Approve (devotica-bot; skipped if no token)
+        if: >
+          steps.meta.outputs.package-ecosystem == 'github_actions' ||
+          steps.meta.outputs.update-type == 'version-update:semver-patch' ||
+          steps.meta.outputs.update-type == 'version-update:semver-minor'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.BOT_REVIEW_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          if [ -n "${GH_TOKEN:-}" ]; then
+            gh pr review --approve "$PR_URL"
+          else
+            echo "::notice::BOT_REVIEW_TOKEN not set — skipping approval (fine on unprotected repos)."
+          fi
+
+      - name: Enable auto-merge
+        if: >
+          steps.meta.outputs.package-ecosystem == 'github_actions' ||
+          steps.meta.outputs.update-type == 'version-update:semver-patch' ||
+          steps.meta.outputs.update-type == 'version-update:semver-minor'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PR_URL"

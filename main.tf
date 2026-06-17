@@ -113,7 +113,7 @@ resource "aws_vpc_security_group_ingress_rule" "from_sources" {
   referenced_security_group_id = each.value
 }
 
-# trivy:ignore:AWS-0104 — unrestricted egress is intentional for Fargate
+# trivy:ignore:AVD-AWS-0104 — unrestricted egress is intentional for Fargate
 # tasks: they must reach ECR (image pulls), Secrets Manager, KMS, CloudWatch
 # Logs, and downstream app dependencies (RDS, caches, third-party APIs) on a
 # range of ports. Locking egress down would require VPC endpoints for every

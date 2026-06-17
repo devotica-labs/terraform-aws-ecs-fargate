@@ -135,7 +135,235 @@ resource "aws_vpc_security_group_ingress_rule" "db_from_ecs" {
 - Dependabot PRs auto-approve + auto-merge once CI is green.
 
 <!-- BEGIN_TF_DOCS -->
-<!-- terraform-docs will inject the inputs/outputs/resources tables here on the next CI run -->
+
+
+## Usage
+
+### Basic
+
+```hcl
+# ---------------------------------------------------------------------------
+# Provider block — CI-friendly skip flags + non-AWS-shaped placeholder creds.
+# ---------------------------------------------------------------------------
+provider "aws" {
+  region                      = "ap-south-1"
+  access_key                  = "not-a-real-aws-key"
+  secret_key                  = "not-a-real-aws-secret"
+  skip_credentials_validation = true
+  skip_metadata_api_check     = true
+  skip_requesting_account_id  = true
+}
+
+# Uses local path during development.
+# Change to Registry source after first release:
+#   source  = "devotica-labs/ecs-fargate/aws"
+#   version = "~> 0.1"
+
+module "ecs" {
+  source = "../.."
+
+  name = "my-app"
+
+  vpc_id     = "vpc-00000000000000000"
+  subnet_ids = ["subnet-aaaaaaaaaaaaaaaaa", "subnet-bbbbbbbbbbbbbbbbb"]
+
+  # Allow inbound on the container port from the ALB's security group.
+  ingress_security_group_ids = ["sg-00000000000000000"]
+
+  container_image = "public.ecr.aws/nginx/nginx:1.27-alpine"
+  container_port  = 80
+
+  # Defaults already cover the fintech baseline: private networking,
+  # assign_public_ip = false, container insights on, read-only root fs,
+  # ECS Exec off, 2 desired tasks, ARM64/Graviton.
+
+  tags = {
+    Environment = "example"
+    Project     = "terraform-aws-ecs-fargate"
+    Owner       = "platform@devotica.com"
+    CostCenter  = "PLATFORM-OSS"
+    ManagedBy   = "Terraform"
+    Repo        = "https://github.com/devotica-labs/terraform-aws-ecs-fargate"
+  }
+}
+```
+
+### Complete
+
+```hcl
+# ---------------------------------------------------------------------------
+# Provider block — CI-friendly skip flags + non-AWS-shaped placeholder creds.
+# ---------------------------------------------------------------------------
+provider "aws" {
+  region                      = "ap-south-1"
+  access_key                  = "not-a-real-aws-key"
+  secret_key                  = "not-a-real-aws-secret"
+  skip_credentials_validation = true
+  skip_metadata_api_check     = true
+  skip_requesting_account_id  = true
+}
+
+# Uses local path during development.
+# Change to Registry source after first release:
+#   source  = "devotica-labs/ecs-fargate/aws"
+#   version = "~> 0.1"
+
+module "ecs" {
+  source = "../.."
+
+  name = "devotica-prod-payments-api"
+
+  vpc_id     = "vpc-00000000000000000"
+  subnet_ids = ["subnet-aaaaaaaaaaaaaaaaa", "subnet-bbbbbbbbbbbbbbbbb", "subnet-ccccccccccccccccc"]
+
+  # Ingress only from the ALB's security group (terraform-aws-alb output).
+  ingress_security_group_ids = ["sg-0albalbalbalbalb0"]
+
+  # Container
+  container_image = "111122223333.dkr.ecr.ap-south-1.amazonaws.com/payments-api:1.4.2"
+  container_name  = "payments-api"
+  container_port  = 8080
+  cpu             = 1024
+  memory          = 2048
+
+  environment = {
+    APP_ENV   = "production"
+    LOG_LEVEL = "info"
+  }
+
+  # Secret env vars pulled from Secrets Manager — the execution role is
+  # granted read + KMS decrypt automatically.
+  secrets = {
+    DATABASE_URL    = "arn:aws:secretsmanager:ap-south-1:111122223333:secret:payments/db-url-AbCdEf"
+    JWT_SIGNING_KEY = "arn:aws:secretsmanager:ap-south-1:111122223333:secret:payments/jwt-AbCdEf"
+  }
+
+  readonly_root_filesystem = true
+
+  # Task role gets workload permissions (e.g. read the data bucket).
+  additional_task_role_policy_arns = [
+    "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess",
+  ]
+
+  # Logs encrypted with the workload KMS key (terraform-aws-kms output).
+  log_kms_key_arn    = "arn:aws:kms:ap-south-1:111122223333:key/00000000-0000-0000-0000-000000000000"
+  log_retention_days = 90
+
+  # Service
+  desired_count          = 3
+  enable_execute_command = false
+
+  # Register with the ALB target group (terraform-aws-alb output).
+  alb_target_group_arn              = "arn:aws:elasticloadbalancing:ap-south-1:111122223333:targetgroup/devotica-prod-edge-api/0123456789abcdef"
+  health_check_grace_period_seconds = 90
+
+  # Target-tracking autoscaling on CPU + memory.
+  enable_autoscaling        = true
+  autoscaling_min_capacity  = 3
+  autoscaling_max_capacity  = 20
+  autoscaling_cpu_target    = 65
+  autoscaling_memory_target = 75
+
+  tags = {
+    Environment = "production"
+    Project     = "payments"
+    Owner       = "payments-team@devotica.com"
+    CostCenter  = "PAYMENTS"
+    ManagedBy   = "Terraform"
+    Repo        = "https://github.com/devotica-labs/terraform-aws-ecs-fargate"
+  }
+}
+```
+
+## Requirements
+
+| Name | Version |
+|------|---------|
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.6.0, < 2.0.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 6.44 |
+## Providers
+
+| Name | Version |
+|------|---------|
+| <a name="provider_aws"></a> [aws](#provider\_aws) | ~> 6.44 |
+## Resources
+
+| Name | Type |
+|------|------|
+| [aws_appautoscaling_policy.cpu](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/appautoscaling_policy) | resource |
+| [aws_appautoscaling_policy.memory](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/appautoscaling_policy) | resource |
+| [aws_appautoscaling_target.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/appautoscaling_target) | resource |
+| [aws_cloudwatch_log_group.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_group) | resource |
+| [aws_ecs_cluster.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/ecs_cluster) | resource |
+| [aws_ecs_cluster_capacity_providers.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/ecs_cluster_capacity_providers) | resource |
+| [aws_ecs_service.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/ecs_service) | resource |
+| [aws_ecs_task_definition.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/ecs_task_definition) | resource |
+| [aws_iam_role.execution](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
+| [aws_iam_role.task](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
+| [aws_iam_role_policy.execution_secrets](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
+| [aws_iam_role_policy_attachment.execution_managed](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
+| [aws_iam_role_policy_attachment.task_additional](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
+| [aws_security_group.service](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group) | resource |
+| [aws_vpc_security_group_egress_rule.all](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc_security_group_egress_rule) | resource |
+| [aws_vpc_security_group_ingress_rule.from_sources](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc_security_group_ingress_rule) | resource |
+## Inputs
+
+| Name | Description | Type | Default | Required |
+|------|-------------|------|---------|:--------:|
+| <a name="input_container_image"></a> [container\_image](#input\_container\_image) | Container image URI (e.g. <account>.dkr.ecr.<region>.amazonaws.com/app:tag or a public image). | `string` | n/a | yes |
+| <a name="input_name"></a> [name](#input\_name) | Logical name for the service. Used as the prefix for the cluster (when created), task family, service, log group, IAM roles, and security group. | `string` | n/a | yes |
+| <a name="input_subnet_ids"></a> [subnet\_ids](#input\_subnet\_ids) | Subnet IDs the Fargate tasks attach to. Should be PRIVATE subnets — tasks reach the internet via NAT, and inbound traffic arrives via the ALB. Must span at least two AZs for HA. | `list(string)` | n/a | yes |
+| <a name="input_vpc_id"></a> [vpc\_id](#input\_vpc\_id) | VPC the service runs in. Used for the auto-created service security group. | `string` | n/a | yes |
+| <a name="input_additional_task_role_policy_arns"></a> [additional\_task\_role\_policy\_arns](#input\_additional\_task\_role\_policy\_arns) | Managed-policy ARNs to attach to the created task role. Ignored when task\_role\_arn is supplied. | `list(string)` | `[]` | no |
+| <a name="input_alb_target_group_arn"></a> [alb\_target\_group\_arn](#input\_alb\_target\_group\_arn) | ARN of an ALB target group to register the service with. Empty (default) runs the service without a load balancer (e.g. a worker/queue consumer). | `string` | `""` | no |
+| <a name="input_assign_public_ip"></a> [assign\_public\_ip](#input\_assign\_public\_ip) | Assign a public IP to each task ENI. Default false — Fargate tasks belong in private subnets behind the ALB. Only set true for tasks in public subnets without a NAT gateway (not recommended for fintech). | `bool` | `false` | no |
+| <a name="input_autoscaling_cpu_target"></a> [autoscaling\_cpu\_target](#input\_autoscaling\_cpu\_target) | Target average CPU utilisation (%) for the CPU target-tracking policy. 0 disables the CPU policy. | `number` | `70` | no |
+| <a name="input_autoscaling_max_capacity"></a> [autoscaling\_max\_capacity](#input\_autoscaling\_max\_capacity) | Maximum task count when autoscaling is enabled. | `number` | `10` | no |
+| <a name="input_autoscaling_memory_target"></a> [autoscaling\_memory\_target](#input\_autoscaling\_memory\_target) | Target average memory utilisation (%) for the memory target-tracking policy. 0 disables the memory policy. | `number` | `0` | no |
+| <a name="input_autoscaling_min_capacity"></a> [autoscaling\_min\_capacity](#input\_autoscaling\_min\_capacity) | Minimum task count when autoscaling is enabled. | `number` | `2` | no |
+| <a name="input_cluster_arn"></a> [cluster\_arn](#input\_cluster\_arn) | ARN of an existing ECS cluster to deploy into. Required when create\_cluster = false; ignored otherwise. | `string` | `""` | no |
+| <a name="input_command"></a> [command](#input\_command) | Override the container's CMD. Empty list uses the image default. | `list(string)` | `[]` | no |
+| <a name="input_container_name"></a> [container\_name](#input\_container\_name) | Name of the container in the task definition. Defaults to var.name when empty. | `string` | `""` | no |
+| <a name="input_container_port"></a> [container\_port](#input\_container\_port) | Port the container listens on. Also the target-group / SG ingress port. | `number` | `8080` | no |
+| <a name="input_cpu"></a> [cpu](#input\_cpu) | Task-level CPU units (Fargate valid combos: 256, 512, 1024, 2048, 4096, 8192, 16384). | `number` | `512` | no |
+| <a name="input_create_cluster"></a> [create\_cluster](#input\_create\_cluster) | Create a new ECS cluster. Set false to attach the service to an existing cluster supplied via cluster\_arn. | `bool` | `true` | no |
+| <a name="input_deployment_maximum_percent"></a> [deployment\_maximum\_percent](#input\_deployment\_maximum\_percent) | Upper bound (% of desired\_count) allowed to run during a deployment (rolling headroom). | `number` | `200` | no |
+| <a name="input_deployment_minimum_healthy_percent"></a> [deployment\_minimum\_healthy\_percent](#input\_deployment\_minimum\_healthy\_percent) | Lower bound (% of desired\_count) that must stay RUNNING during a deployment. | `number` | `100` | no |
+| <a name="input_desired_count"></a> [desired\_count](#input\_desired\_count) | Number of task copies to run. 2+ for HA across AZs. | `number` | `2` | no |
+| <a name="input_enable_autoscaling"></a> [enable\_autoscaling](#input\_enable\_autoscaling) | Enable Application Auto Scaling (target tracking on CPU and/or memory) for the service. | `bool` | `false` | no |
+| <a name="input_enable_container_insights"></a> [enable\_container\_insights](#input\_enable\_container\_insights) | Enable CloudWatch Container Insights on the created cluster (metrics + per-task observability). Ignored when create\_cluster = false. | `bool` | `true` | no |
+| <a name="input_enable_execute_command"></a> [enable\_execute\_command](#input\_enable\_execute\_command) | Enable ECS Exec (interactive shell into running tasks). Default false — it's a powerful debugging backdoor; enable deliberately and audit via CloudTrail when you do. | `bool` | `false` | no |
+| <a name="input_environment"></a> [environment](#input\_environment) | Plain (non-secret) environment variables for the container, as a name → value map. | `map(string)` | `{}` | no |
+| <a name="input_health_check_grace_period_seconds"></a> [health\_check\_grace\_period\_seconds](#input\_health\_check\_grace\_period\_seconds) | Grace period before the ECS service starts honoring ALB health checks on new tasks. Only applies when alb\_target\_group\_arn is set. Give slow-booting apps enough time. | `number` | `60` | no |
+| <a name="input_ingress_security_group_ids"></a> [ingress\_security\_group\_ids](#input\_ingress\_security\_group\_ids) | Security group IDs allowed to reach the tasks on container\_port — typically the ALB's security group. Used by the auto-created service SG. Ignored when service\_security\_group\_ids is set. | `list(string)` | `[]` | no |
+| <a name="input_log_kms_key_arn"></a> [log\_kms\_key\_arn](#input\_log\_kms\_key\_arn) | KMS key ARN to encrypt the CloudWatch log group (typically the workload key from terraform-aws-kms). Empty uses AWS-owned default encryption. The key policy must allow the CloudWatch Logs service in this region. | `string` | `""` | no |
+| <a name="input_log_retention_days"></a> [log\_retention\_days](#input\_log\_retention\_days) | CloudWatch Logs retention for the task's log group. | `number` | `30` | no |
+| <a name="input_memory"></a> [memory](#input\_memory) | Task-level memory (MiB). Must be a valid pairing with cpu — see AWS Fargate task size table. | `number` | `1024` | no |
+| <a name="input_platform_version"></a> [platform\_version](#input\_platform\_version) | Fargate platform version. LATEST tracks the newest, which AWS keeps backward-compatible. | `string` | `"LATEST"` | no |
+| <a name="input_readonly_root_filesystem"></a> [readonly\_root\_filesystem](#input\_readonly\_root\_filesystem) | Mount the container root filesystem read-only (defence in depth; satisfies CKV\_AWS\_336). Default true. Set false for apps that must write to the root fs (prefer a writable volume/tmpfs instead). | `bool` | `true` | no |
+| <a name="input_secrets"></a> [secrets](#input\_secrets) | Secret environment variables, as name → ARN map. ARN points at a Secrets Manager secret or SSM SecureString parameter. Injected via the ECS `secrets` block; the execution role is granted read on these. | `map(string)` | `{}` | no |
+| <a name="input_service_security_group_ids"></a> [service\_security\_group\_ids](#input\_service\_security\_group\_ids) | Bring-your-own security group IDs for the service. When set, the module does NOT create a security group and ignores ingress\_security\_group\_ids. | `list(string)` | `[]` | no |
+| <a name="input_tags"></a> [tags](#input\_tags) | Additional tags merged onto every taggable resource. | `map(string)` | `{}` | no |
+| <a name="input_task_execution_role_arn"></a> [task\_execution\_role\_arn](#input\_task\_execution\_role\_arn) | ARN of an existing task EXECUTION role (pulls images, writes logs, reads secrets). Empty (default) makes the module create one with AmazonECSTaskExecutionRolePolicy + read on var.secrets + KMS decrypt. | `string` | `""` | no |
+| <a name="input_task_role_arn"></a> [task\_role\_arn](#input\_task\_role\_arn) | ARN of an existing TASK role (the identity the app code assumes — e.g. to call S3/RDS IAM-auth). Empty (default) makes the module create an empty-policy role you can attach policies to out-of-band, or via additional\_task\_role\_policy\_arns. | `string` | `""` | no |
+| <a name="input_use_fargate_spot"></a> [use\_fargate\_spot](#input\_use\_fargate\_spot) | Run tasks on FARGATE\_SPOT (cheaper, interruptible) instead of on-demand FARGATE. Use only for fault-tolerant / non-critical workloads (e.g. sandbox). | `bool` | `false` | no |
+## Outputs
+
+| Name | Description |
+|------|-------------|
+| <a name="output_autoscaling_target_resource_id"></a> [autoscaling\_target\_resource\_id](#output\_autoscaling\_target\_resource\_id) | Application Auto Scaling target resource ID (empty when autoscaling disabled). |
+| <a name="output_cluster_arn"></a> [cluster\_arn](#output\_cluster\_arn) | ARN of the ECS cluster the service runs in (created or caller-supplied). |
+| <a name="output_cluster_name"></a> [cluster\_name](#output\_cluster\_name) | Name of the ECS cluster. |
+| <a name="output_execution_role_arn"></a> [execution\_role\_arn](#output\_execution\_role\_arn) | ARN of the task execution role (created or caller-supplied). |
+| <a name="output_log_group_arn"></a> [log\_group\_arn](#output\_log\_group\_arn) | ARN of the CloudWatch log group. |
+| <a name="output_log_group_name"></a> [log\_group\_name](#output\_log\_group\_name) | CloudWatch log group the task logs to. |
+| <a name="output_security_group_id"></a> [security\_group\_id](#output\_security\_group\_id) | ID of the auto-created service security group. Empty string when service\_security\_group\_ids was supplied. App tiers (e.g. RDS) should allow ingress from this SG. |
+| <a name="output_service_id"></a> [service\_id](#output\_service\_id) | ID (ARN) of the ECS service. |
+| <a name="output_service_name"></a> [service\_name](#output\_service\_name) | Name of the ECS service. |
+| <a name="output_task_definition_arn"></a> [task\_definition\_arn](#output\_task\_definition\_arn) | ARN of the current task definition revision. |
+| <a name="output_task_definition_family"></a> [task\_definition\_family](#output\_task\_definition\_family) | Task definition family name. |
+| <a name="output_task_role_arn"></a> [task\_role\_arn](#output\_task\_role\_arn) | ARN of the task role — attach app/workload permissions here (created or caller-supplied). |
+| <a name="output_task_role_name"></a> [task\_role\_name](#output\_task\_role\_name) | Name of the created task role (empty when a task\_role\_arn was supplied). Use to attach inline/managed policies out of band. |
 <!-- END_TF_DOCS -->
 
 ## License

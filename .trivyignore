@@ -1,0 +1,12 @@
+# AVD-AWS-0104 — "Security group rule allows unrestricted egress to any IP".
+#
+# Intentional for the ECS service security group created by this module:
+# Fargate tasks require outbound to ECR (image pulls), Secrets Manager, KMS,
+# CloudWatch Logs (execution role), and arbitrary downstream app dependencies
+# (RDS:5432, caches, third-party HTTPS APIs) on many ports. Locking egress
+# down would require VPC endpoints for every AWS service plus an enumerated
+# destination allow-list — out of scope for a general-purpose service module.
+# Inbound IS restricted to the configured source security groups only.
+#
+# Defined at: main.tf  resource "aws_vpc_security_group_egress_rule" "all"
+AVD-AWS-0104

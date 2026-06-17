@@ -113,6 +113,13 @@ resource "aws_vpc_security_group_ingress_rule" "from_sources" {
   referenced_security_group_id = each.value
 }
 
+# trivy:ignore:AWS-0104 — unrestricted egress is intentional for Fargate
+# tasks: they must reach ECR (image pulls), Secrets Manager, KMS, CloudWatch
+# Logs, and downstream app dependencies (RDS, caches, third-party APIs) on a
+# range of ports. Locking egress down would require VPC endpoints for every
+# AWS service plus an enumerated allow-list of app destinations — out of
+# scope for a general-purpose service module. Inbound is already restricted
+# to the configured source SGs only (see aws_vpc_security_group_ingress_rule).
 resource "aws_vpc_security_group_egress_rule" "all" {
   count = local.create_service_sg ? 1 : 0
 

@@ -8,6 +8,19 @@ Releases are cut automatically by `release-please` on merge to `main`,
 driven by Conventional Commit prefixes (`feat:` → minor, `fix:`/`docs:`/`chore:` → patch,
 `feat!:` or `BREAKING CHANGE:` footer → major).
 
+## 0.1.0 (2026-06-17)
+
+
+### Features
+
+* initial terraform-aws-ecs-fargate module ([c106a7f](https://github.com/devotica-labs/terraform-aws-ecs-fargate/commit/c106a7f7971d24c2f778657dc4c2241704079bf2))
+
+
+### Bug Fixes
+
+* **tfsec:** annotate intentional unrestricted egress on the service SG ([#6](https://github.com/devotica-labs/terraform-aws-ecs-fargate/issues/6)) ([e2aa613](https://github.com/devotica-labs/terraform-aws-ecs-fargate/commit/e2aa613528e639309a660d53ed1a1cfd1207df30))
+* **tfsec:** suppress intentional egress finding via .trivyignore ([#7](https://github.com/devotica-labs/terraform-aws-ecs-fargate/issues/7)) ([996ebb8](https://github.com/devotica-labs/terraform-aws-ecs-fargate/commit/996ebb82073ad76cfd48290ce317010b08925965))
+
 ## [Unreleased]
 
 ### Added
